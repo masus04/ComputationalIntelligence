@@ -47,10 +47,12 @@ def remove_outliers(x):
     Q3 = np.percentile(x, 75)
     range = [Q1-1.5*(Q3-Q1),Q3+1.5*(Q3-Q1)]
     positions = np.concatenate((np.where(x>range[1]),np.where(x<range[0])),axis=1)[0]
+    outliers = np.take(x, positions)
+    if len(outliers) > 0:
+        print('Removed outliers: %s' % outliers)
     return np.delete(x, positions), positions
 
 def remove_outliers_from_dataset(data):
-    # TODO: How to remove outliers? collect indices and remove all equivalent time steps?
     data = deepcopy(data)
     
     positions = set()
