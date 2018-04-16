@@ -23,20 +23,17 @@ test_data = utils.load_test_data()
 test_data = utils.remove_outliers_from_dataset(test_data)
 
 """ Fuzzy membership function definitions """
+
+N_FUZZY_SUBSETS = 7
+
 fuzzy_memberships = {}
-fuzzy_memberships['t_2'] = ctrl.Antecedent(np.arange(0, max(test_data['t_2']), 1), 't_2')
-fuzzy_memberships['t_1'] = ctrl.Antecedent(np.arange(0, max(test_data['t_1']), 1), 't_1')
-fuzzy_memberships['t'] = ctrl.Antecedent(np.arange(0, max(test_data['t']), 1), 't')
+for key in training_data:
+    if key == 'p':  # Because this is a Consequent rather than an Antecedent
+        fuzzy_memberships['p'] = ctrl.Consequent(np.arange(0, max(training_data['p']), 1), 'p')
+    else:
+        fuzzy_memberships[key] = ctrl.Antecedent(np.arange(0, max(training_data[key]), 1), key)
 
-fuzzy_memberships['d_2'] = ctrl.Antecedent(np.arange(0, max(test_data['d_2']), 1), 'd_2')
-fuzzy_memberships['d_1'] = ctrl.Antecedent(np.arange(0, max(test_data['d_1']), 1), 'd_1')
-fuzzy_memberships['d'] = ctrl.Antecedent(np.arange(0, max(test_data['d']), 1), 'd')
-
-fuzzy_memberships['p'] = ctrl.Consequent(np.arange(0, max(test_data['p']), 1), 'p')
-
-n_fuzzy_subsets = 7
-for key in fuzzy_memberships:
-    fuzzy_memberships[key].automf(n_fuzzy_subsets)
+    fuzzy_memberships[key].automf(N_FUZZY_SUBSETS)
     fuzzy_memberships[key].view()
     
 """ Fuzzy rules definitions """
