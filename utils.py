@@ -6,6 +6,7 @@ Created on Mon Apr  9 12:14:08 2018
 """
 import csv
 import numpy as np
+from copy import deepcopy
 
 def load_data(path):
     """
@@ -41,18 +42,27 @@ def load_test_data():
     return load_data('./data/2018_CI_Assignment_Testing_Data.csv')
 
 def remove_outliers(x):
+    x = deepcopy(x)
     Q1 = np.percentile(x, 25)
     Q3 = np.percentile(x, 75)
     range = [Q1-1.5*(Q3-Q1),Q3+1.5*(Q3-Q1)]
-    # print('Q1: %s, Q3: %s, range: %s' %(Q1, Q3, range))
-    position = np.concatenate((np.where(x>range[1]),np.where(x<range[0])),axis=1)[0]
-    outliers = np.take(x, position)
-    return np.delete(x, position), outliers
+    positions = np.concatenate((np.where(x>range[1]),np.where(x<range[0])),axis=1)[0]
+    return np.delete(x, positions), positions
 
 def remove_outliers_from_dataset(data):
     # TODO: How to remove outliers? collect indices and remove all equivalent time steps?
+    data = deepcopy(data)
+    
+    positions = set()
     for key in data:
-        data[key], outliers = remove_outliers(data[key])
-        print('Removed the following outliers from %s: %s' % (key, outliers))
-        
+        d, pos = remove_outliers(data[key])
+        positions.update(pos)
+    
+    for key in data:
+        data[key] = np.delete(data[key], list(positions))
+    
     return data
+
+
+
+

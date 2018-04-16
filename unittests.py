@@ -26,16 +26,19 @@ class UnitTests(unittest.TestCase):
         arr[50]=4
         arr[80]=5
         
-        data, outliers = remove_outliers(arr)
+        data, positions = remove_outliers(arr)
         self.assertEqual(len(data), 97, msg='Outliers were not removed properly')
+        outliers = np.take(data, positions)
         self.assertEqual(len(outliers), 3, msg='Outliers were not properly returned')
 
     def test_removeOutliersFromDataset(self):
-        data = load_test_data()
-        data = remove_outliers_from_dataset(data)
+        data = load_training_data()
+        data2 = remove_outliers_from_dataset(data)
         
-        self.assertEqual(len(data), 7, msg='Column number incorrect')
-        self.assertEqual(len(data['p']), 485, msg='Row number incorrect')        
+        self.assertNotEqual(data, data2)
+        self.assertEqual(len(data['t']), 956)
+        self.assertEqual(len(data2['t']), 901)
+        
 
 if __name__ == '__main__':
     unittest.main()
