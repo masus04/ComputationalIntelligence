@@ -27,7 +27,7 @@ def load_data(path):
             d.append(float(row['D(t)']))
             p.append(float(row['P(t+1)']))
             
-    return {'t_2': t_2, 't_1': t_1, 't': t, 'd_2': d_2, 'd_1': d_1, 'd': d, 'p': p}
+    return {'t_2': t_2, 't_1': t_1, 't': t, 'd_2': d_2, 'd_1': d_1, 'd': d, 'p': p}        
 
 def load_training_data():
     """
@@ -49,7 +49,7 @@ def remove_outliers(x):
     positions = np.concatenate((np.where(x>range[1]),np.where(x<range[0])),axis=1)[0]
     outliers = np.take(x, positions)
     if len(outliers) > 0:
-        print('Removed outliers: %s' % outliers)
+        print('Removed outliers: \n%s' % outliers)
     return np.delete(x, positions), positions
 
 def remove_outliers_from_dataset(data):
