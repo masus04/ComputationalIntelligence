@@ -5,13 +5,26 @@ Created on Mon Apr  9 12:09:26 2018
 @author: 19591676
 """
 
+import sys
 import utils
-from random import randint
+from datetime import datetime
+from random import choice
 from copy import deepcopy
 import numpy as np
-import skfuzzy as fuzz
 from skfuzzy import control as ctrl
 import matplotlib.pyplot as plt
+
+# Print helper method
+def print_inplace(text, percentage, time_taken=None, comment=""):
+        percentage = int(percentage)
+        length_factor = 5
+        progress_bar = int(round(percentage/length_factor)) * "*" + (round((100-percentage)/length_factor)) * "."
+        progress_bar = progress_bar[:round(len(progress_bar)/2)] + "|" + str(int(percentage)) + "%|" + progress_bar[round(len(progress_bar)/2):]
+        sys.stdout.write("\r%s |%s|" % (text, progress_bar) + (" Time: %s" % str(time_taken).split(".")[0] if time_taken else "") + comment)
+        sys.stdout.flush()
+
+        if percentage == 100:
+            print()
 
 """ Data loading and preprocessing """
 training_data = utils.load_training_data()
@@ -61,11 +74,11 @@ def names(num_names):
         return list(names[2:-2])
     raise Exception('Illegal number of names')
 
-temp = ctrl.Antecedent(np.arange(0, max(training_data['t_2']), 1), 'Temperature')
+temp = ctrl.Antecedent(np.arange(0, max(training_data['t_2']), 1), 'temp')
 temp.automf(TEMP_SUBSETS, names=names(TEMP_SUBSETS))
-demand = ctrl.Antecedent(np.arange(0, max(training_data['d']), 1), 'Demand')
+demand = ctrl.Antecedent(np.arange(0, max(training_data['d']), 1), 'demand')
 demand.automf(DEMAND_SUBSETS, names=names(DEMAND_SUBSETS))
-price = ctrl.Consequent(np.arange(0, max(training_data['p']), 1), 'Price')
+price = ctrl.Consequent(np.arange(0, max(training_data['p']), 1), 'price')
 price.automf(PRICE_SUBSETS, names=names(PRICE_SUBSETS))
 
 universes = [temp, demand, price]
@@ -77,64 +90,79 @@ for universe in universes:
     
 """ Fuzzy rules definitions """
 # create all possible and rules
-rules = []
+allRules = []
 for tmp_name in names(TEMP_SUBSETS):
     for dem_name in names(DEMAND_SUBSETS):
         for out_name in names(PRICE_SUBSETS):
-            rules.append(ctrl.Rule(temp[tmp_name] | demand[dem_name], price[out_name]))
+            allRules.append(ctrl.Rule(temp[tmp_name] | demand[dem_name], price[out_name]))
 
 # Todo: Feature selection by crossValidation
 """ Feature selection: Evolutionary approach """
 # Parameters
+start = datetime.now()
+
 TOTAL_FEATURES = TEMP_SUBSETS * DEMAND_SUBSETS * PRICE_SUBSETS
 ITERATIONS = TOTAL_FEATURES * 2 // 3
 
 
-def evaluate_simulation(pop):
-    return randint(0, 100)
-    # TODO: implement
-    pass
+def build_simulation(rule_indices):
+    rules = [rule for rule, selected in zip(allRules, rule_indices) if selected]
+    control_system = ctrl.ControlSystem(rules)
+    return ctrl.ControlSystemSimulation(control_system)
+
+    
+def evaluate_simulation(simulation, evaluation_dataset):
+    error = 0
+    for t2, d, p in zip(evaluation_dataset["t_2"], evaluation_dataset["d"], evaluation_dataset["p"]):
+        simulation.input["temp"] = t2
+        simulation.input["demand"] = d
+        simulation.compute()
+        error += abs(simulation.output['price'] + p)/p
+        
+    return -error/len(test_data['p'])
 
 
-def build_simulation():
-    # TODO: implement
-    pass
-
+def evaluate_population(pop, evaluation_dataset):
+    simulation = build_simulation(pop)
+    return evaluate_simulation(simulation, evaluation_dataset)
+    
 
 def mutate(pop, index, direction):
     """ Mutates(flips) each gene and evaluates it. Returns a tuple (accuracy, population) """
-    new_pop = deepcopy(pop)
+    # print_inplace('Mutation %s/%s' % (index, len(pop)), index/len(pop)*100, time_taken=datetime.now()-start)
+    new_pop = list(deepcopy(pop))
     
     if new_pop[index] != direction:             # Mutate if not already active
         new_pop[index] = direction
-        return evaluate_simulation(new_pop), new_pop
+        return evaluate_population(new_pop, training_data), new_pop
     
-    return -1, None                             # Return -1 accuracy if mutation was not performed
+    return -100000, new_pop                     # Return -1 accuracy if mutation was not performed
 
 
 # Generate initial population
-population = [False for i in range(TOTAL_FEATURES)]
-best_population = evaluate_simulation(population), population
+population = [choice([False, True, False]) for i in range(TOTAL_FEATURES)]
+best_population = evaluate_population(population, training_data), deepcopy(population)
 
 for i in range(ITERATIONS):
-    # Pick two
+    print_inplace('Feature selection iteration %s/%s' % (i+1, ITERATIONS), i/ITERATIONS*100, time_taken=datetime.now()-start, comment=' | Best Population: Average Error: %s, population: %s' % (abs(best_population[0]), best_population[1]))
+    
+    # Add Rules
     for takes in range(2):
-        candidate = max([mutate(population, index, True) for index in range(len(population))])
+        score, population = max([mutate(population, index, True) for index in range(len(population))])
         # Save best performing
-        if candidate[0] > best_population[0]:
-            best_population = deepcopy(candidate)
+        if score > best_population[0]:
+            best_population = score, deepcopy(population)
    
-    # Drop one
-    candidate = max([mutate(population, index, False) for index in range(len(population))])
-    # Save best performing
-    if candidate[0] > best_population[0]:
-        best_population = deepcopy(candidate)
-
-
-# Structure: rule = ctrl.Rule(temp[0], price[4])
-# tipping_ctrl = ctrl.ControlSystem(rules)
-# simulation = ctrl.ControlSystemSimulation(tipping_ctrl)
+    # Remove Rules
+    for takes in range(1):
+        score, population = max([mutate(population, index, False) for index in range(len(population))])
+        # Save best performing
+        if score > best_population[0]:
+            best_population = score, deepcopy(population)
 
 print("Best Population:")
-print(best_population)
+print(best_population[1])
+print('Average error on training set: %s' % best_population[0])
 
+# Evaluate best population on testset
+print('Average error on training set: %s' % evaluate_population(best_population[1], test_data))
