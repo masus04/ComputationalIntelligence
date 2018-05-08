@@ -140,7 +140,8 @@ def mutate(pop, index, direction):
 
 
 # Generate initial population
-population = [choice([False, True, False]) for i in range(TOTAL_FEATURES)]
+population = [False for i in range(TOTAL_FEATURES)]
+population[0], population[-1] = True, True
 best_population = evaluate_population(population, training_data), deepcopy(population)
 
 for i in range(ITERATIONS):

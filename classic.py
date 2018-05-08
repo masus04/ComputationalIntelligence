@@ -100,11 +100,36 @@ price.view()
 grid = [[[0, 0, 0], [0, 0, 0]], [[0, 0, 0], [0, 0, 0]], [[0, 0, 0], [0, 0, 0]]]
 
 for t, d, p in zip(training_data['t_2'], training_data['d'], training_data['p']):
+    # Weighted membership
+    grid[0][0][0] += interp_membership(price.universe, price_low, p) * interp_membership(temp.universe, temp_low, t) * interp_membership(demand.universe, demand_low, d)
+    grid[0][0][1] += interp_membership(price.universe, price_low, p) * interp_membership(temp.universe, temp_low, t) * interp_membership(demand.universe, demand_mid, d)
+    grid[0][0][2] += interp_membership(price.universe, price_low, p) * interp_membership(temp.universe, temp_low, t) * interp_membership(demand.universe, demand_high, d)
+    grid[0][1][0] += interp_membership(price.universe, price_low, p) * interp_membership(temp.universe, temp_high, t) * interp_membership(demand.universe, demand_low, d)
+    grid[0][1][1] += interp_membership(price.universe, price_low, p) * interp_membership(temp.universe, temp_high, t) * interp_membership(demand.universe, demand_mid, d)
+    grid[0][1][2] += interp_membership(price.universe, price_low, p) * interp_membership(temp.universe, temp_high, t) * interp_membership(demand.universe, demand_high, d)
+    
+    grid[1][0][0] += interp_membership(price.universe, price_medium, p) * interp_membership(temp.universe, temp_low, t) * interp_membership(demand.universe, demand_low, d)
+    grid[1][0][1] += interp_membership(price.universe, price_medium, p) * interp_membership(temp.universe, temp_low, t) * interp_membership(demand.universe, demand_mid, d)
+    grid[1][0][2] += interp_membership(price.universe, price_medium, p) * interp_membership(temp.universe, temp_low, t) * interp_membership(demand.universe, demand_high, d)
+    grid[1][1][0] += interp_membership(price.universe, price_medium, p) * interp_membership(temp.universe, temp_high, t) * interp_membership(demand.universe, demand_low, d)
+    grid[1][1][1] += interp_membership(price.universe, price_medium, p) * interp_membership(temp.universe, temp_high, t) * interp_membership(demand.universe, demand_mid, d)
+    grid[1][1][2] += interp_membership(price.universe, price_medium, p) * interp_membership(temp.universe, temp_high, t) * interp_membership(demand.universe, demand_high, d)
+    
+    grid[1][0][0] += interp_membership(price.universe, price_high, p) * interp_membership(temp.universe, temp_low, t) * interp_membership(demand.universe, demand_low, d)
+    grid[1][0][1] += interp_membership(price.universe, price_high, p) * interp_membership(temp.universe, temp_low, t) * interp_membership(demand.universe, demand_mid, d)
+    grid[1][0][2] += interp_membership(price.universe, price_high, p) * interp_membership(temp.universe, temp_low, t) * interp_membership(demand.universe, demand_high, d)
+    grid[1][1][0] += interp_membership(price.universe, price_high, p) * interp_membership(temp.universe, temp_high, t) * interp_membership(demand.universe, demand_low, d)
+    grid[1][1][1] += interp_membership(price.universe, price_high, p) * interp_membership(temp.universe, temp_high, t) * interp_membership(demand.universe, demand_mid, d)
+    grid[1][1][2] += interp_membership(price.universe, price_high, p) * interp_membership(temp.universe, temp_high, t) * interp_membership(demand.universe, demand_high, d)
+    
+    # Max membership
+    '''
     t = max((interp_membership(temp.universe, temp_low, t), 0), (interp_membership(temp.universe, temp_high, t), 1))[1]
     d = max((interp_membership(demand.universe, demand_low, d), 0), (interp_membership(demand.universe, demand_mid, d), 1), (interp_membership(demand.universe, demand_high, d), 2))[1]
     p = max((interp_membership(price.universe, price_low, p), 0), (interp_membership(price.universe, price_medium, p), 1), (interp_membership(price.universe, price_high, p), 2))[1]
     grid[p][t][d] += 1
-
+    '''
+    
 print(grid)
 fig = plt.figure()
 fig.set_figwidth(15)
@@ -116,7 +141,7 @@ ax = fig.add_subplot(133)
 ax.imshow(grid[2], interpolation='nearest')
 plt.show()
 
-""" Fuzzy rules definitions """
+""" Fuzzy rules definitions (max membership)"""
 # High support rules
 rules = []
 rules.append(ctrl.Rule(temp['low'] | demand['low'], price['low']))
@@ -127,25 +152,36 @@ rules.append(ctrl.Rule(temp['high'] | demand['high'], price['high']))
 rules.append(ctrl.Rule(temp['low'] | demand['high'], price['medium']))
 rules.append(ctrl.Rule(temp['low'] | demand['medium'], price['high']))
 
-# Low support rules
+""" Fuzzy rules definitions (weighted membership)"""
+rules.append(ctrl.Rule(temp['low'] | demand['low'], price['low']))
+rules.append(ctrl.Rule(temp['low'] | demand['medium'], price['medium']))
+
+# Medium support rules
+rules.append(ctrl.Rule(temp['low'] | demand['medium'], price['low']))
+rules.append(ctrl.Rule(temp['low'] | demand['high'], price['medium']))
+rules.append(ctrl.Rule(temp['high'] | demand['high'], price['med']))
+
 
 
 """ Build and evaluate simulation """
+def evaluate_simulation(data_set):
+    error = 0
+    for t, d, p in zip(data_set['t_2'], data_set['d'], data_set['p']):
+        simulation.input["temp"] = t
+        simulation.input["demand"] = d
+        simulation.compute()
+        error += abs(simulation.output['price'] + p)/p
+
+    return error / len(data_set['p'])
+
+
 control_system = ctrl.ControlSystem(rules)
 simulation = ctrl.ControlSystemSimulation(control_system)
 
-error = 0
-for t, d, p in zip(test_data['t_2'], test_data['d'], test_data['p']):
-    simulation.input["temp"] = t
-    simulation.input["demand"] = d
-    simulation.compute()
-    error += abs(simulation.output['price'] + p)/p
+print('Average training error: %s' % evaluate_simulation(training_data))
+print('Average test error: %s' % evaluate_simulation(test_data))
 
-error /= len(test_data['p'])
-
-print('Average error: %s' % error)
-
-
+## | ----------------------- | ##
 
 
 
